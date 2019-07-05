@@ -1,9 +1,17 @@
 from collections import Counter
 
+import dpkt
+
 class Sequence:
     def __init__(self, items, host_id):
         self.items = items
         self.host_id = host_id
+
+    def __eq__(self, other):
+        return self.items == other.items and self.host_id == other.host_id
+
+    def __hash__(self):
+      return hash((tuple(self.items), self.host_id))
 
 def is_subsequence(sequence, candidate):
     for k in range(0, len(sequence.items)):
@@ -25,9 +33,22 @@ def calculate_support(candidate, sequences):
     for sequence in sequences:
         if is_subsequence(sequence, candidate):
             supported_hosts.add(sequence.host_id)
-    
+
     return len(list(supported_hosts))/unique_host_count
-    
+
+def remove_redundant_subsequent_sets(sequences):
+    result = []
+
+    for i in range(0, len(sequences)):
+        is_redundant = False
+        for j in range(i + 1, len(sequences)):
+            if sequences[i].host_id == sequences[j].host_id and is_subsequence(sequences[j], sequences[i]):
+                is_redundant = True
+                break
+        if not is_redundant:
+            result.append(sequences[i])
+    return result
+
 def extract_candidate(sequences):
     next_length_level_sequences = []
     for sequence_1 in sequences:
@@ -39,7 +60,7 @@ def extract_candidate(sequences):
                 #next_length_level_sequences.append(Sequence(new_subsequence_items, sequence_1.host_id))
                 if sequence_1.host_id == sequence_2.host_id:
                     next_length_level_sequences.append(Sequence(new_subsequence_items, sequence_2.host_id))
-            
+
 
             if len(sequence_1.items) > 1:
                 is_subsequence = True
@@ -68,50 +89,42 @@ def extract_subsequence_set(sequence_set, minimum_support):
         for sequence in length_i_subsequence_sets[length - 2]:
             if (calculate_support(sequence, sequence_set) >= minimum_support):
                 supported_sequences.append(sequence)
-        length_i_subsequence_sets[length - 2] = supported_sequences
-        length_i_subsequence_sets.append(extract_candidate(supported_sequences))
+        length_i_subsequence_sets[length - 2] = list(set(supported_sequences))
+        length_i_subsequence_sets.append(extract_candidate(length_i_subsequence_sets[length - 2]))
         if len(length_i_subsequence_sets[length - 1]) == 0:
             break
-        
-        is_redundants = []
-        for sequence1 in length_i_subsequence_sets[length - 1]:
-            is_redundant = False
-            for sequence2 in length_i_subsequence_sets[length - 1]:
-                if is_subsequence(sequence2, sequence1):
-                    is_redundant = True
-                    break
-            is_redundants.append(is_redundant)
 
-        final_subsequence_set = []
-
-        for i in range(0, len(is_redundants)):
-            if (not is_redundants[i]):
-                final_subsequence_set.append(length_i_subsequence_sets[length - 1][i])
-        length_i_subsequence_sets[length - 1] = final_subsequence_set
         length += 1
 
     subsequence_set = []
     for subsequence in length_i_subsequence_sets:
         subsequence_set.extend(subsequence)
 
+    subsequence_set = remove_redundant_subsequent_sets(subsequence_set)
+
     return subsequence_set
-        
+
 
 def main():
-    test_case = [Sequence([1, 2, 3], 1), Sequence([0, 1, 2], 1), Sequence([2, 3, 4], 2)]
-    for sequence in extract_candidate(test_case):
-        print(sequence.host_id)
-        print(sequence.items)
+#    test_case = [Sequence([1, 2, 3], 1), Sequence([0, 1, 2], 1), Sequence([2, 3, 4], 2)]
+#    for sequence in extract_candidate(test_case):
+#        print(sequence.host_id)
+#        print(sequence.items)
+#
+#    print(calculate_support(Sequence([1, 2, 3, 8], 1), test_case))
+#
+#    test_case.extend([Sequence([1, 2, 3, 5, 8, 9, 4, 8], 1), Sequence([0, 1, 2, 2, 6, 8], 1), Sequence([2, 3, 4, 5, 8, 9, 4], 1), Sequence([2, 3, 5, 8, 9, 4], 1)])
+#    print(calculate_support(Sequence([2, 8], 1), test_case))
+#
+#
+#    for sequence in extract_subsequence_set(test_case, 0.3):
+#        print(sequence.host_id)
+#        print(sequence.items)
+#
+#    for ts, pkt in dpkt.pcap.Reader(open(filename,'r')):
 
-    print(calculate_support(Sequence([1, 2, 3, 8], 1), test_case))
+    pass
 
-    test_case.extend([Sequence([1, 2, 3, 5, 8, 9, 4, 8], 3), Sequence([0, 1, 2, 2, 6, 8], 4), Sequence([2, 3, 4, 5, 8, 9, 4], 6), Sequence([2, 3, 5, 8, 9, 4], 5)])
-    print(calculate_support(Sequence([2, 8], 1), test_case))
-
-
-    for sequence in extract_subsequence_set(test_case, 0.1):
-        print(sequence.host_id)
-        print(sequence.items)
 
 if __name__ == "__main__":
     main()
